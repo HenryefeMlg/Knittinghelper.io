@@ -1,73 +1,277 @@
-body {
-  background: #0b0f0e;
-  color: #e8f1ef;
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Henry Games – Knitting Helper</title>
+
+<style>
+:root{
+  --bg:#0b0f0e;
+  --main:#2ec4b6;
+  --dark:#1f2a28;
+  --text:#e8f1ef;
 }
 
-header {
-  background: #0b0f0e;
-  border-bottom: 1px solid #2ec4b6;
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:system-ui,sans-serif;
 }
 
-header h2 {
-  color: #2ec4b6;
-  letter-spacing: 2px;
+/* HEADER */
+header{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:12px;
+  border-bottom:1px solid var(--main);
 }
 
-header small {
-  color: #9adbd3;
+header img{ height:48px; }
+
+header h1{
+  margin:0;
+  font-size:1.2rem;
+  letter-spacing:2px;
+  color:var(--main);
 }
 
-.controls {
-  background: #0f1615;
-  border-bottom: 1px solid #1f2a28;
+header small{
+  display:block;
+  color:#9adbd3;
+  letter-spacing:1px;
+}
+
+/* CONTROLS */
+.controls{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  padding:10px;
+  background:#0f1615;
+  border-bottom:1px solid var(--dark);
 }
 
 .controls input,
-.controls button {
-  background: #0b0f0e;
-  color: #e8f1ef;
-  border: 1px solid #2ec4b6;
+.controls button{
+  background:var(--bg);
+  color:var(--text);
+  border:1px solid var(--main);
+  padding:4px 6px;
 }
 
-.controls button {
-  cursor: pointer;
+.controls button{
+  cursor:pointer;
 }
 
-.controls button:hover {
-  background: #2ec4b6;
-  color: #0b0f0e;
+.controls button:hover{
+  background:var(--main);
+  color:var(--bg);
 }
 
-.workspace {
-  background: #0b0f0e;
+/* GRID */
+.workspace{
+  padding:10px;
+  overflow:auto;
 }
 
-.cell {
-  border: 1px solid #1f2a28;
-}
-
-.cell.grey {
-  filter: grayscale(1) brightness(0.6);
+.layout{
+  display:grid;
+  grid-template-columns:auto 1fr;
 }
 
 .labels-top,
-.labels-left {
-  color: #2ec4b6;
+.labels-left{
+  display:grid;
+  font-size:12px;
+  color:var(--main);
+  user-select:none;
 }
 
-.viewer {
-  background: rgba(11, 15, 14, 0.95);
+.grid{
+  display:grid;
 }
 
-.viewer-inner {
-  background: #0b0f0e;
-  border: 1px solid #2ec4b6;
+.cell{
+  border:1px solid #000;
+  box-sizing:border-box;
 }
 
-.close {
-  color: #2ec4b6;
+/* VIEWER */
+.viewer{
+  position:fixed;
+  inset:0;
+  background:rgba(11,15,14,.96);
+  display:none;
+  justify-content:center;
+  align-items:center;
 }
 
-.close:hover {
-  color: #ffffff;
+.viewer.active{ display:flex; }
+
+.viewer-inner{
+  background:var(--bg);
+  padding:10px;
+  border:1px solid var(--main);
+  max-height:95vh;
+  overflow:auto;
+  position:relative;
 }
+
+.close{
+  position:absolute;
+  right:8px;
+  top:4px;
+  font-size:22px;
+  cursor:pointer;
+  color:var(--main);
+}
+
+.close:hover{ color:#fff; }
+
+/* SATIR VURGUSU */
+.cell.dim{
+  filter:brightness(0.85);
+}
+
+.cell.active{
+  filter:brightness(1.25) saturate(1.2);
+  box-shadow:0 0 8px rgba(46,196,182,.6);
+  z-index:2;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <img src="logo.png" alt="Henry Games">
+  <div>
+    <h1>HENRY GAMES</h1>
+    <small>KNITTING HELPER</small>
+  </div>
+</header>
+
+<div class="controls">
+  Pixel Boyutu <input type="number" id="pixelSize" value="24">
+  Genişlik(px) <input type="number" id="gridW" value="20">
+  Yükseklik(px) <input type="number" id="gridH" value="20">
+  <input type="file" id="imgInput" accept="image/*">
+  <button id="viewBtn">Görüntüleme Modu</button>
+</div>
+
+<div class="workspace">
+  <div class="layout">
+    <div></div>
+    <div id="topLabels" class="labels-top"></div>
+    <div id="leftLabels" class="labels-left"></div>
+    <div id="grid" class="grid"></div>
+  </div>
+</div>
+
+<div class="viewer" id="viewer">
+  <div class="viewer-inner">
+    <div class="close" id="closeViewer">✖</div>
+    <div id="viewerGrid"></div>
+  </div>
+</div>
+
+<script>
+let pixels=[], currentRow=0;
+
+const grid=document.getElementById("grid");
+const viewer=document.getElementById("viewer");
+const viewerGrid=document.getElementById("viewerGrid");
+
+function buildLabels(w,h,size){
+  topLabels.style.gridTemplateColumns=`repeat(${w},${size}px)`;
+  topLabels.innerHTML=[...Array(w)].map((_,i)=>`<div>${i+1}</div>`).join("");
+
+  leftLabels.style.gridTemplateRows=`repeat(${h},${size}px)`;
+  leftLabels.innerHTML=[...Array(h)].map((_,i)=>`<div>${String.fromCharCode(65+i%26)}</div>`).join("");
+}
+
+function buildGrid(img){
+  const size=+pixelSize.value;
+  const w=+gridW.value;
+  const h=+gridH.value;
+
+  grid.style.gridTemplateColumns=`repeat(${w},${size}px)`;
+  grid.innerHTML="";
+  pixels=[];
+
+  const c=document.createElement("canvas");
+  c.width=w; c.height=h;
+  const ctx=c.getContext("2d");
+  ctx.drawImage(img,0,0,w,h);
+  const data=ctx.getImageData(0,0,w,h).data;
+
+  for(let y=0;y<h;y++){
+    pixels[y]=[];
+    for(let x=0;x<w;x++){
+      const i=(y*w+x)*4;
+      const col=`rgb(${data[i]},${data[i+1]},${data[i+2]})`;
+      pixels[y][x]=col;
+
+      const d=document.createElement("div");
+      d.className="cell";
+      d.style.width=size+"px";
+      d.style.height=size+"px";
+      d.style.background=col;
+      grid.appendChild(d);
+    }
+  }
+  buildLabels(w,h,size);
+}
+
+imgInput.onchange=()=>{
+  const img=new Image();
+  img.onload=()=>buildGrid(img);
+  img.src=URL.createObjectURL(imgInput.files[0]);
+};
+
+viewBtn.onclick=()=>{
+  viewer.classList.add("active");
+  currentRow=0;
+  renderViewer();
+};
+
+closeViewer.onclick=()=>viewer.classList.remove("active");
+
+function renderViewer(){
+  viewerGrid.innerHTML="";
+  const size=+pixelSize.value;
+  viewerGrid.style.display="grid";
+  viewerGrid.style.gridTemplateColumns=
+    `repeat(${pixels[0].length},${size}px)`;
+
+  for(let y=0;y<pixels.length;y++){
+    for(let x=0;x<pixels[y].length;x++){
+      const d=document.createElement("div");
+      d.className="cell";
+      d.style.width=size+"px";
+      d.style.height=size+"px";
+      d.style.background=pixels[y][x];
+
+      if(y===currentRow){
+        d.classList.add("active");
+      }else{
+        d.classList.add("dim");
+      }
+      viewerGrid.appendChild(d);
+    }
+  }
+}
+
+window.addEventListener("keydown",e=>{
+  if(!viewer.classList.contains("active")) return;
+  if(e.key==="ArrowDown" && currentRow<pixels.length-1) currentRow++;
+  if(e.key==="ArrowUp" && currentRow>0) currentRow--;
+  renderViewer();
+});
+</script>
+
+</body>
+</html>
