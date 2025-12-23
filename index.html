@@ -9,7 +9,6 @@
 :root{
   --bg:#0b0f0e;
   --main:#2ec4b6;
-  --dark:#1f2a28;
   --text:#e8f1ef;
 }
 
@@ -38,11 +37,7 @@ header h1{
   color:var(--main);
 }
 
-header small{
-  display:block;
-  color:#9adbd3;
-  letter-spacing:1px;
-}
+header small{ color:#9adbd3; }
 
 /* CONTROLS */
 .controls{
@@ -51,7 +46,6 @@ header small{
   gap:8px;
   padding:10px;
   background:#0f1615;
-  border-bottom:1px solid var(--dark);
 }
 
 .controls input,
@@ -60,83 +54,46 @@ header small{
   color:var(--text);
   border:1px solid var(--main);
   padding:6px 8px;
-  font-size:14px;
 }
 
-.controls button{
-  cursor:pointer;
-}
-
-.controls button:hover{
-  background:var(--main);
-  color:var(--bg);
-}
+.controls button{ cursor:pointer; }
 
 /* GRID */
-.workspace{
-  padding:10px;
-  overflow:auto;
-}
-
-.layout{
-  display:grid;
-  grid-template-columns:auto 1fr;
-}
-
-.labels-top,
-.labels-left{
-  display:grid;
-  font-size:12px;
-  color:var(--main);
-  user-select:none;
-}
-
-.grid{
-  display:grid;
-}
-
-.cell{
-  border:1px solid #000;
-  box-sizing:border-box;
-}
+.workspace{ padding:10px; overflow:auto; }
+.grid{ display:grid; }
+.cell{ border:1px solid #000; }
 
 /* VIEWER */
 .viewer{
   position:fixed;
   inset:0;
-  background:rgba(11,15,14,.96);
+  background:rgba(0,0,0,.95);
   display:none;
+  overflow:hidden;
 }
 
-.viewer.active{ display:flex; }
+.viewer.active{ display:block; }
 
 .viewer-inner{
-  background:var(--bg);
-  padding:10px;
-  border:1px solid var(--main);
-  max-height:95vh;
-  overflow:auto;
-  position:relative;
-  margin:auto;
-}
-
-.close{
   position:absolute;
-  right:8px;
-  top:4px;
-  font-size:22px;
-  cursor:pointer;
-  color:var(--main);
+  inset:0;
+  overflow:hidden;
+  touch-action:none;
 }
 
-/* SATIR VURGUSU */
-.cell.dim{ filter:brightness(0.85); }
+#viewerGrid{
+  display:grid;
+  transform-origin:0 0;
+}
+
+/* SATIR */
+.cell.dim{ filter:brightness(.8); }
 .cell.active{
-  filter:brightness(1.25) saturate(1.2);
-  box-shadow:0 0 8px rgba(46,196,182,.6);
+  filter:brightness(1.3);
+  box-shadow:0 0 6px rgba(46,196,182,.6);
 }
 
-/* YÖN TUŞLARI (MOBİL) */
+/* MOBİL BUTONLAR */
 .nav-buttons{
   position:fixed;
   right:10px;
@@ -148,25 +105,22 @@ header small{
   z-index:10;
 }
 
-.nav-buttons button{
-  font-size:28px;
-  padding:10px;
+.nav-buttons button,
+.close-mobile{
+  font-size:26px;
+  padding:12px;
   background:var(--bg);
   border:1px solid var(--main);
   color:var(--text);
-  border-radius:8px;
+  border-radius:10px;
 }
 
-.nav-buttons button:active{
-  background:var(--main);
-  color:var(--bg);
-}
-
-/* MOBİL */
-@media(max-width:600px){
-  .controls input{ width:100%; }
-  .layout{ grid-template-columns:1fr; }
-  .labels-left{ display:none; }
+.close-mobile{
+  position:fixed;
+  bottom:15px;
+  left:50%;
+  transform:translateX(-50%);
+  z-index:10;
 }
 </style>
 </head>
@@ -174,34 +128,24 @@ header small{
 <body>
 
 <header>
-  <img src="0e6e119e5_1000013257-removebg-preview.png" alt="Henry Games">
-  <div>
-    <h1>HENRY GAMES</h1>
-    <small>KNITTING HELPER</small>
-  </div>
+  <h1>HENRY GAMES <small>KNITTING HELPER</small></h1>
 </header>
 
 <div class="controls">
-  Pixel Boyutu <input type="number" id="pixelSize" value="24">
-  Genişlik <input type="number" id="gridW" value="20">
-  Yükseklik <input type="number" id="gridH" value="20">
+  Pixel <input type="number" id="pixelSize" value="24">
+  W <input type="number" id="gridW" value="20">
+  H <input type="number" id="gridH" value="20">
   <input type="file" id="imgInput" accept="image/*">
   <button id="applyBtn">Uygula</button>
-  <button id="viewBtn">Görüntüleme</button>
+  <button id="viewBtn">Görüntüle</button>
 </div>
 
 <div class="workspace">
-  <div class="layout">
-    <div></div>
-    <div id="topLabels" class="labels-top"></div>
-    <div id="leftLabels" class="labels-left"></div>
-    <div id="grid" class="grid"></div>
-  </div>
+  <div id="grid" class="grid"></div>
 </div>
 
 <div class="viewer" id="viewer">
-  <div class="viewer-inner">
-    <div class="close" id="closeViewer">✖</div>
+  <div class="viewer-inner" id="viewerInner">
     <div id="viewerGrid"></div>
   </div>
 </div>
@@ -211,27 +155,25 @@ header small{
   <button id="downBtn">⬇️</button>
 </div>
 
+<button class="close-mobile" id="closeMobile">❌ Kapat</button>
+
 <script>
 let pixels=[], currentRow=0, lastImg=null;
+let scale=1, posX=0, posY=0;
+let startDist=0, startScale=1;
+let startX=0, startY=0, dragging=false;
 
 const grid=document.getElementById("grid");
 const viewer=document.getElementById("viewer");
 const viewerGrid=document.getElementById("viewerGrid");
+const viewerInner=document.getElementById("viewerInner");
 const navButtons=document.getElementById("navButtons");
-
-function buildLabels(w,h,size){
-  topLabels.style.gridTemplateColumns=`repeat(${w},${size}px)`;
-  topLabels.innerHTML=[...Array(w)].map((_,i)=>`<div>${i+1}</div>`).join("");
-  leftLabels.style.gridTemplateRows=`repeat(${h},${size}px)`;
-  leftLabels.innerHTML=[...Array(h)].map((_,i)=>`<div>${String.fromCharCode(65+i%26)}</div>`).join("");
-}
 
 function buildGrid(img){
   lastImg=img;
   const size=+pixelSize.value;
   const w=+gridW.value;
   const h=+gridH.value;
-
   grid.style.gridTemplateColumns=`repeat(${w},${size}px)`;
   grid.innerHTML="";
   pixels=[];
@@ -256,7 +198,30 @@ function buildGrid(img){
       grid.appendChild(d);
     }
   }
-  buildLabels(w,h,size);
+}
+
+function renderViewer(){
+  viewerGrid.innerHTML="";
+  const size=+pixelSize.value;
+  viewerGrid.style.gridTemplateColumns=
+    `repeat(${pixels[0].length},${size}px)`;
+
+  pixels.forEach((row,y)=>{
+    row.forEach(col=>{
+      const d=document.createElement("div");
+      d.className="cell "+(y===currentRow?"active":"dim");
+      d.style.width=size+"px";
+      d.style.height=size+"px";
+      d.style.background=col;
+      viewerGrid.appendChild(d);
+    });
+  });
+  applyTransform();
+}
+
+function applyTransform(){
+  viewerGrid.style.transform=
+    `translate(${posX}px,${posY}px) scale(${scale})`;
 }
 
 imgInput.onchange=()=>{
@@ -265,54 +230,67 @@ imgInput.onchange=()=>{
   img.src=URL.createObjectURL(imgInput.files[0]);
 };
 
-applyBtn.onclick=()=>{
-  if(lastImg) buildGrid(lastImg);
-};
+applyBtn.onclick=()=>lastImg&&buildGrid(lastImg);
 
 viewBtn.onclick=()=>{
   viewer.classList.add("active");
   navButtons.style.display="flex";
+  document.getElementById("closeMobile").style.display="block";
+  scale=1; posX=0; posY=0;
   currentRow=0;
   renderViewer();
 };
 
-closeViewer.onclick=()=>{
+closeMobile.onclick=()=>{
   viewer.classList.remove("active");
   navButtons.style.display="none";
+  closeMobile.style.display="none";
 };
 
-function renderViewer(){
-  viewerGrid.innerHTML="";
-  const size=+pixelSize.value;
-  viewerGrid.style.display="grid";
-  viewerGrid.style.gridTemplateColumns=
-    `repeat(${pixels[0].length},${size}px)`;
+upBtn.onclick=()=>{ if(currentRow>0){currentRow--;renderViewer();}};
+downBtn.onclick=()=>{ if(currentRow<pixels.length-1){currentRow++;renderViewer();}};
 
-  for(let y=0;y<pixels.length;y++){
-    for(let x=0;x<pixels[y].length;x++){
-      const d=document.createElement("div");
-      d.className="cell";
-      d.style.width=size+"px";
-      d.style.height=size+"px";
-      d.style.background=pixels[y][x];
-      d.classList.add(y===currentRow?"active":"dim");
-      viewerGrid.appendChild(d);
-    }
+/* TOUCH ZOOM + PAN */
+viewerInner.addEventListener("touchstart",e=>{
+  if(e.touches.length===2){
+    startDist=Math.hypot(
+      e.touches[0].clientX-e.touches[1].clientX,
+      e.touches[0].clientY-e.touches[1].clientY
+    );
+    startScale=scale;
   }
-}
-
-upBtn.onclick=()=>{
-  if(currentRow>0){ currentRow--; renderViewer(); }
-};
-downBtn.onclick=()=>{
-  if(currentRow<pixels.length-1){ currentRow++; renderViewer(); }
-};
-
-window.addEventListener("keydown",e=>{
-  if(!viewer.classList.contains("active")) return;
-  if(e.key==="ArrowDown") downBtn.onclick();
-  if(e.key==="ArrowUp") upBtn.onclick();
+  if(e.touches.length===1){
+    dragging=true;
+    startX=e.touches[0].clientX-posX;
+    startY=e.touches[0].clientY-posY;
+  }
 });
+
+viewerInner.addEventListener("touchmove",e=>{
+  e.preventDefault();
+  if(e.touches.length===2){
+    const dist=Math.hypot(
+      e.touches[0].clientX-e.touches[1].clientX,
+      e.touches[0].clientY-e.touches[1].clientY
+    );
+    scale=Math.min(4,Math.max(.5,startScale*dist/startDist));
+  }
+  if(dragging && e.touches.length===1){
+    posX=e.touches[0].clientX-startX;
+    posY=e.touches[0].clientY-startY;
+  }
+  applyTransform();
+},{passive:false});
+
+viewerInner.addEventListener("touchend",()=>dragging=false);
+
+/* MOUSE ZOOM */
+viewerInner.addEventListener("wheel",e=>{
+  e.preventDefault();
+  scale+=e.deltaY*-0.001;
+  scale=Math.min(4,Math.max(.5,scale));
+  applyTransform();
+},{passive:false});
 </script>
 
 </body>
