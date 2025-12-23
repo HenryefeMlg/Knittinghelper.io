@@ -19,35 +19,57 @@ body{
   font-family:system-ui,sans-serif;
 }
 
+/* HEADER */
+header{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:12px;
+  border-bottom:1px solid var(--main);
+}
+
+header img{ height:44px; }
+
+header h1{
+  margin:0;
+  font-size:1.1rem;
+  letter-spacing:2px;
+  color:var(--main);
+}
+
+header small{ color:#9adbd3; }
+
 /* CONTROLS */
 .controls{
   display:flex;
   flex-wrap:wrap;
   gap:8px;
   padding:10px;
-  border-bottom:1px solid var(--main);
+  background:#0f1615;
 }
 
 .controls input,
 .controls button{
-  background:#000;
+  background:var(--bg);
   color:var(--text);
   border:1px solid var(--main);
   padding:6px 8px;
 }
 
-button{ cursor:pointer; }
+.controls button{ cursor:pointer; }
 
 /* GRID */
-.grid{ display:grid; padding:10px; }
+.workspace{ padding:10px; overflow:auto; }
+.grid{ display:grid; }
 .cell{ border:1px solid #000; }
 
 /* VIEWER */
 .viewer{
   position:fixed;
   inset:0;
-  background:rgba(0,0,0,.96);
+  background:rgba(0,0,0,.95);
   display:none;
+  overflow:hidden;
 }
 
 .viewer.active{ display:block; }
@@ -62,17 +84,17 @@ button{ cursor:pointer; }
 #viewerGrid{
   display:grid;
   transform-origin:0 0;
-  will-change:transform;
 }
 
+/* SATIR */
 .cell.dim{ filter:brightness(.8); }
 .cell.active{
   filter:brightness(1.3);
   box-shadow:0 0 6px rgba(46,196,182,.6);
 }
 
-/* BUTTONS */
-.nav{
+/* MOBİL BUTONLAR */
+.nav-buttons{
   position:fixed;
   right:10px;
   top:50%;
@@ -83,67 +105,76 @@ button{ cursor:pointer; }
   z-index:10;
 }
 
-.nav button,
-.close{
-  font-size:24px;
+.nav-buttons button,
+.close-mobile{
+  font-size:26px;
   padding:12px;
-  background:#000;
+  background:var(--bg);
   border:1px solid var(--main);
   color:var(--text);
   border-radius:10px;
 }
 
-.close{
+.close-mobile{
   position:fixed;
   bottom:15px;
   left:50%;
   transform:translateX(-50%);
-  display:none;
+  z-index:10;
 }
 </style>
 </head>
 
 <body>
 
+<header>
+  <h1>HENRY GAMES <small>KNITTING HELPER</small></h1>
+</header>
+
 <div class="controls">
-  Pixel <input id="pixelSize" type="number" value="24">
-  W <input id="gridW" type="number" value="20">
-  H <input id="gridH" type="number" value="20">
-  <input id="imgInput" type="file" accept="image/*">
+  Pixel <input type="number" id="pixelSize" value="24">
+  W <input type="number" id="gridW" value="20">
+  H <input type="number" id="gridH" value="20">
+  <input type="file" id="imgInput" accept="image/*">
   <button id="applyBtn">Uygula</button>
   <button id="viewBtn">Görüntüle</button>
 </div>
 
-<div id="grid" class="grid"></div>
+<div class="workspace">
+  <div id="grid" class="grid"></div>
+</div>
 
-<div id="viewer" class="viewer">
-  <div id="viewerInner" class="viewer-inner">
+<div class="viewer" id="viewer">
+  <div class="viewer-inner" id="viewerInner">
     <div id="viewerGrid"></div>
   </div>
 </div>
 
-<div id="nav" class="nav">
-  <button id="up">⬆️</button>
-  <button id="down">⬇️</button>
+<div class="nav-buttons" id="navButtons">
+  <button id="upBtn">⬆️</button>
+  <button id="downBtn">⬇️</button>
 </div>
 
-<button id="close" class="close">❌ Kapat</button>
+<button class="close-mobile" id="closeMobile">❌ Kapat</button>
 
 <script>
-let pixels=[], imgCache=null, row=0;
-let scale=1, x=0, y=0;
+let pixels=[], currentRow=0, lastImg=null;
+let scale=1, posX=0, posY=0;
 let startDist=0, startScale=1;
-let sx=0, sy=0, dragging=false, raf=false;
+let startX=0, startY=0, dragging=false;
 
 const grid=document.getElementById("grid");
 const viewer=document.getElementById("viewer");
 const viewerGrid=document.getElementById("viewerGrid");
 const viewerInner=document.getElementById("viewerInner");
+const navButtons=document.getElementById("navButtons");
 
 function buildGrid(img){
-  imgCache=img;
-  const s=+pixelSize.value,w=+gridW.value,h=+gridH.value;
-  grid.style.gridTemplateColumns=`repeat(${w},${s}px)`;
+  lastImg=img;
+  const size=+pixelSize.value;
+  const w=+gridW.value;
+  const h=+gridH.value;
+  grid.style.gridTemplateColumns=`repeat(${w},${size}px)`;
   grid.innerHTML="";
   pixels=[];
 
@@ -151,75 +182,75 @@ function buildGrid(img){
   c.width=w; c.height=h;
   const ctx=c.getContext("2d");
   ctx.drawImage(img,0,0,w,h);
-  const d=ctx.getImageData(0,0,w,h).data;
+  const data=ctx.getImageData(0,0,w,h).data;
 
-  for(let j=0;j<h;j++){
-    pixels[j]=[];
-    for(let i=0;i<w;i++){
-      const k=(j*w+i)*4;
-      const col=`rgb(${d[k]},${d[k+1]},${d[k+2]})`;
-      pixels[j][i]=col;
-      const el=document.createElement("div");
-      el.className="cell";
-      el.style=`width:${s}px;height:${s}px;background:${col}`;
-      grid.appendChild(el);
+  for(let y=0;y<h;y++){
+    pixels[y]=[];
+    for(let x=0;x<w;x++){
+      const i=(y*w+x)*4;
+      const col=`rgb(${data[i]},${data[i+1]},${data[i+2]})`;
+      pixels[y][x]=col;
+      const d=document.createElement("div");
+      d.className="cell";
+      d.style.width=size+"px";
+      d.style.height=size+"px";
+      d.style.background=col;
+      grid.appendChild(d);
     }
   }
 }
 
 function renderViewer(){
-  const s=+pixelSize.value;
   viewerGrid.innerHTML="";
-  viewerGrid.style.gridTemplateColumns=`repeat(${pixels[0].length},${s}px)`;
+  const size=+pixelSize.value;
+  viewerGrid.style.gridTemplateColumns=
+    `repeat(${pixels[0].length},${size}px)`;
 
-  pixels.forEach((r,y)=>{
-    r.forEach(col=>{
+  pixels.forEach((row,y)=>{
+    row.forEach(col=>{
       const d=document.createElement("div");
-      d.className="cell "+(y===row?"active":"dim");
-      d.style=`width:${s}px;height:${s}px;background:${col}`;
+      d.className="cell "+(y===currentRow?"active":"dim");
+      d.style.width=size+"px";
+      d.style.height=size+"px";
+      d.style.background=col;
       viewerGrid.appendChild(d);
     });
   });
+  applyTransform();
 }
 
-function transform(){
-  if(raf) return;
-  raf=true;
-  requestAnimationFrame(()=>{
-    viewerGrid.style.transform=
-      `translate3d(${x}px,${y}px,0) scale(${scale})`;
-    raf=false;
-  });
+function applyTransform(){
+  viewerGrid.style.transform=
+    `translate(${posX}px,${posY}px) scale(${scale})`;
 }
 
-/* INPUT */
 imgInput.onchange=()=>{
   const img=new Image();
   img.onload=()=>buildGrid(img);
   img.src=URL.createObjectURL(imgInput.files[0]);
 };
-applyBtn.onclick=()=>imgCache&&buildGrid(imgCache);
 
-/* VIEW */
+applyBtn.onclick=()=>lastImg&&buildGrid(lastImg);
+
 viewBtn.onclick=()=>{
   viewer.classList.add("active");
-  nav.style.display="flex";
-  close.style.display="block";
-  row=0; scale=1; x=0; y=0;
-  renderViewer(); transform();
+  navButtons.style.display="flex";
+  document.getElementById("closeMobile").style.display="block";
+  scale=1; posX=0; posY=0;
+  currentRow=0;
+  renderViewer();
 };
 
-close.onclick=()=>{
+closeMobile.onclick=()=>{
   viewer.classList.remove("active");
-  nav.style.display="none";
-  close.style.display="none";
+  navButtons.style.display="none";
+  closeMobile.style.display="none";
 };
 
-/* ROW */
-up.onclick=()=>{ if(row>0){row--;renderViewer();} };
-down.onclick=()=>{ if(row<pixels.length-1){row++;renderViewer();} };
+upBtn.onclick=()=>{ if(currentRow>0){currentRow--;renderViewer();}};
+downBtn.onclick=()=>{ if(currentRow<pixels.length-1){currentRow++;renderViewer();}};
 
-/* TOUCH */
+/* TOUCH ZOOM + PAN */
 viewerInner.addEventListener("touchstart",e=>{
   if(e.touches.length===2){
     startDist=Math.hypot(
@@ -230,27 +261,36 @@ viewerInner.addEventListener("touchstart",e=>{
   }
   if(e.touches.length===1){
     dragging=true;
-    sx=e.touches[0].clientX-x;
-    sy=e.touches[0].clientY-y;
+    startX=e.touches[0].clientX-posX;
+    startY=e.touches[0].clientY-posY;
   }
 });
 
 viewerInner.addEventListener("touchmove",e=>{
+  e.preventDefault();
   if(e.touches.length===2){
-    const d=Math.hypot(
+    const dist=Math.hypot(
       e.touches[0].clientX-e.touches[1].clientX,
       e.touches[0].clientY-e.touches[1].clientY
     );
-    scale=Math.min(3,Math.max(.7,startScale*d/startDist));
+    scale=Math.min(4,Math.max(.5,startScale*dist/startDist));
   }
   if(dragging && e.touches.length===1){
-    x=e.touches[0].clientX-sx;
-    y=e.touches[0].clientY-sy;
+    posX=e.touches[0].clientX-startX;
+    posY=e.touches[0].clientY-startY;
   }
-  transform();
-},{passive:true});
+  applyTransform();
+},{passive:false});
 
 viewerInner.addEventListener("touchend",()=>dragging=false);
+
+/* MOUSE ZOOM */
+viewerInner.addEventListener("wheel",e=>{
+  e.preventDefault();
+  scale+=e.deltaY*-0.001;
+  scale=Math.min(4,Math.max(.5,scale));
+  applyTransform();
+},{passive:false});
 </script>
 
 </body>
