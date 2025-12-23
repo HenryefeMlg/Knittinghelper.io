@@ -29,11 +29,11 @@ header{
   border-bottom:1px solid var(--main);
 }
 
-header img{ height:48px; }
+header img{ height:44px; }
 
 header h1{
   margin:0;
-  font-size:1.2rem;
+  font-size:1.1rem;
   letter-spacing:2px;
   color:var(--main);
 }
@@ -59,7 +59,8 @@ header small{
   background:var(--bg);
   color:var(--text);
   border:1px solid var(--main);
-  padding:4px 6px;
+  padding:6px 8px;
+  font-size:14px;
 }
 
 .controls button{
@@ -105,8 +106,6 @@ header small{
   inset:0;
   background:rgba(11,15,14,.96);
   display:none;
-  justify-content:center;
-  align-items:center;
 }
 
 .viewer.active{ display:flex; }
@@ -118,6 +117,7 @@ header small{
   max-height:95vh;
   overflow:auto;
   position:relative;
+  margin:auto;
 }
 
 .close{
@@ -129,17 +129,44 @@ header small{
   color:var(--main);
 }
 
-.close:hover{ color:#fff; }
-
 /* SATIR VURGUSU */
-.cell.dim{
-  filter:brightness(0.85);
-}
-
+.cell.dim{ filter:brightness(0.85); }
 .cell.active{
   filter:brightness(1.25) saturate(1.2);
   box-shadow:0 0 8px rgba(46,196,182,.6);
-  z-index:2;
+}
+
+/* YÖN TUŞLARI (MOBİL) */
+.nav-buttons{
+  position:fixed;
+  right:10px;
+  top:50%;
+  transform:translateY(-50%);
+  display:none;
+  flex-direction:column;
+  gap:10px;
+  z-index:10;
+}
+
+.nav-buttons button{
+  font-size:28px;
+  padding:10px;
+  background:var(--bg);
+  border:1px solid var(--main);
+  color:var(--text);
+  border-radius:8px;
+}
+
+.nav-buttons button:active{
+  background:var(--main);
+  color:var(--bg);
+}
+
+/* MOBİL */
+@media(max-width:600px){
+  .controls input{ width:100%; }
+  .layout{ grid-template-columns:1fr; }
+  .labels-left{ display:none; }
 }
 </style>
 </head>
@@ -156,10 +183,11 @@ header small{
 
 <div class="controls">
   Pixel Boyutu <input type="number" id="pixelSize" value="24">
-  Genişlik(px) <input type="number" id="gridW" value="20">
-  Yükseklik(px) <input type="number" id="gridH" value="20">
+  Genişlik <input type="number" id="gridW" value="20">
+  Yükseklik <input type="number" id="gridH" value="20">
   <input type="file" id="imgInput" accept="image/*">
-  <button id="viewBtn">Görüntüleme Modu</button>
+  <button id="applyBtn">Uygula</button>
+  <button id="viewBtn">Görüntüleme</button>
 </div>
 
 <div class="workspace">
@@ -178,22 +206,28 @@ header small{
   </div>
 </div>
 
+<div class="nav-buttons" id="navButtons">
+  <button id="upBtn">⬆️</button>
+  <button id="downBtn">⬇️</button>
+</div>
+
 <script>
-let pixels=[], currentRow=0;
+let pixels=[], currentRow=0, lastImg=null;
 
 const grid=document.getElementById("grid");
 const viewer=document.getElementById("viewer");
 const viewerGrid=document.getElementById("viewerGrid");
+const navButtons=document.getElementById("navButtons");
 
 function buildLabels(w,h,size){
   topLabels.style.gridTemplateColumns=`repeat(${w},${size}px)`;
   topLabels.innerHTML=[...Array(w)].map((_,i)=>`<div>${i+1}</div>`).join("");
-
   leftLabels.style.gridTemplateRows=`repeat(${h},${size}px)`;
   leftLabels.innerHTML=[...Array(h)].map((_,i)=>`<div>${String.fromCharCode(65+i%26)}</div>`).join("");
 }
 
 function buildGrid(img){
+  lastImg=img;
   const size=+pixelSize.value;
   const w=+gridW.value;
   const h=+gridH.value;
@@ -214,7 +248,6 @@ function buildGrid(img){
       const i=(y*w+x)*4;
       const col=`rgb(${data[i]},${data[i+1]},${data[i+2]})`;
       pixels[y][x]=col;
-
       const d=document.createElement("div");
       d.className="cell";
       d.style.width=size+"px";
@@ -232,13 +265,21 @@ imgInput.onchange=()=>{
   img.src=URL.createObjectURL(imgInput.files[0]);
 };
 
+applyBtn.onclick=()=>{
+  if(lastImg) buildGrid(lastImg);
+};
+
 viewBtn.onclick=()=>{
   viewer.classList.add("active");
+  navButtons.style.display="flex";
   currentRow=0;
   renderViewer();
 };
 
-closeViewer.onclick=()=>viewer.classList.remove("active");
+closeViewer.onclick=()=>{
+  viewer.classList.remove("active");
+  navButtons.style.display="none";
+};
 
 function renderViewer(){
   viewerGrid.innerHTML="";
@@ -254,22 +295,23 @@ function renderViewer(){
       d.style.width=size+"px";
       d.style.height=size+"px";
       d.style.background=pixels[y][x];
-
-      if(y===currentRow){
-        d.classList.add("active");
-      }else{
-        d.classList.add("dim");
-      }
+      d.classList.add(y===currentRow?"active":"dim");
       viewerGrid.appendChild(d);
     }
   }
 }
 
+upBtn.onclick=()=>{
+  if(currentRow>0){ currentRow--; renderViewer(); }
+};
+downBtn.onclick=()=>{
+  if(currentRow<pixels.length-1){ currentRow++; renderViewer(); }
+};
+
 window.addEventListener("keydown",e=>{
   if(!viewer.classList.contains("active")) return;
-  if(e.key==="ArrowDown" && currentRow<pixels.length-1) currentRow++;
-  if(e.key==="ArrowUp" && currentRow>0) currentRow--;
-  renderViewer();
+  if(e.key==="ArrowDown") downBtn.onclick();
+  if(e.key==="ArrowUp") upBtn.onclick();
 });
 </script>
 
